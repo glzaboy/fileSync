@@ -1,0 +1,138 @@
+#!/usr/bin/env php
+<?php
+error_reporting(E_ALL & ~ E_NOTICE);
+$cfgfile=realpath('.phpsync');
+if (! $cfgfile) {
+    echo "出错，没有指定配置" . PHP_EOL;
+    exit();
+}
+echo "配置文件为".$cfgfile.PHP_EOL;
+$scfg = parse_ini_file($cfgfile, true);
+//print_r($scfg);
+// $sourcedir = $scfg['source'];
+// $destdir = $scfg['dest'];
+$scfg['source']=realpath($scfg['source']);
+$scfg['dest']=realpath($scfg['dest']);
+if(!$scfg['source']){
+    echo "源地址不存在" . PHP_EOL;
+    exit();
+}
+
+// print_r($scfg);
+
+if(is_array($scfg['exclude_realpath'])){
+    foreach ($scfg['exclude_realpath'] as $k=>$v){
+        $scfg['exclude_realpath'][$k]=$scfg['source'].$v;
+    }
+}
+if(is_array($scfg['rev_exclude_realpath'])){
+    foreach ($scfg['rev_exclude_realpath'] as $k=>$v){
+        $scfg['rev_exclude_realpath'][$k]=$scfg['dest'].$v;
+    }
+}
+echo "COPY {$scfg['source']} to {$scfg['dest']} config file {$argv[1]}",PHP_EOL;
+function copydir($source_dir, $dest_dir)
+{
+    global $scfg;
+    if (! is_dir($source_dir)) {
+        return false;
+    }
+    $s_real = realpath($source_dir);
+    if (! is_dir($dest_dir)) {
+        mkdir($dest_dir);
+    }
+    $d_real = realpath($dest_dir);
+    $s_dir = opendir($s_real);
+    $files = array();
+    $dirs = array();
+    // copy new file;
+    while (false !== ($sitem = readdir($s_dir))) {
+        if (in_array($sitem, array(
+            '.',
+            '..'
+        ))) {
+            continue;
+        }
+        //absolute path;
+        if (in_array($s_real . '/' . $sitem, $scfg['exclude_realpath'])) {
+            echo 'exclude source ' . $s_real . '/' . $sitem . PHP_EOL;
+            continue;
+        }
+        if (in_array( $sitem, $scfg['exclude_byname'])) {
+            echo 'exclude source ' . $s_real . '/' . $sitem . PHP_EOL;
+            continue;
+        }
+        if (is_dir($s_real . '/' . $sitem)) {
+            array_push($dirs, $sitem);
+            copydir($s_real . '/' . $sitem, $d_real . '/' . $sitem);
+        }
+        if (is_file($s_real . '/' . $sitem)) {
+            array_push($files, $sitem);
+            if (file_exists($d_real . '/' . $sitem)) {
+                clearstatcache();
+                $s_md5 = md5_file($s_real . '/' . $sitem);
+                $d_md5 = md5_file($d_real . '/' . $sitem);
+                if ($s_md5 === $d_md5) {
+                    echo "not need update :" . $d_real . '/' . $sitem . PHP_EOL;
+                    continue;
+                }
+            }
+            echo "copy file to :" . $d_real . '/' . $sitem . PHP_EOL;
+            copy($s_real . '/' . $sitem, $d_real . '/' . $sitem);
+        }
+    }
+    closedir($s_dir);
+    // del old file
+    $d_dir = opendir($d_real);
+    while (false !== ($sitem = readdir($d_dir))) {
+        if (in_array($sitem, array(
+            '.',
+            '..'
+        ))) {
+            continue;
+        }
+        if (in_array($d_real . '/' . $sitem, $scfg['rev_exclude_realpath'])) {
+            echo "exclude desc :" . $d_real . '/' . $sitem . PHP_EOL;
+            continue;
+        }
+        if (in_array($sitem, $scfg['rev_exclude_byname'])) {
+            echo "exclude desc :" . $d_real . '/' . $sitem . PHP_EOL;
+            continue;
+        }
+        if (is_dir($d_real . '/' . $sitem)) {
+            if (! in_array($sitem, $dirs)) {
+                // del dir;
+                echo "remove dir :" . $d_real . '/' . $sitem . PHP_EOL;
+                deldir($d_real . '/' . $sitem);
+            }
+        }
+        if (is_file($d_real . '/' . $sitem)) {
+            if (! in_array($sitem, $files)) {
+                echo "remove file :" . $d_real . '/' . $sitem . PHP_EOL;
+                unlink($d_real . '/' . $sitem);
+            }
+        }
+    }
+}
+
+function deldir($dir)
+{
+    $odir = opendir($dir);
+    while (false !== ($sitem = readdir($odir))) {
+        if (in_array($sitem, array(
+            '.',
+            '..'
+        ))) {
+            continue;
+        }
+        if (is_dir($dir . '/' . $sitem)) {
+            deldir($dir . '/' . $sitem);
+        }
+        if (is_file($dir . '/' . $sitem)) {
+            unlink($dir . '/' . $sitem);
+        }
+    }
+    closedir($odir);
+    rmdir($dir);
+}
+copydir($scfg['source'], $scfg['dest']);
