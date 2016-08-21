@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<sync>
+    <target>
+        <path>/Users/guliuzhong/Documents/cms</path>
+        <clean>false</clean>
+        <exclude>
+            <value>/124.txt</value>
+            <value>123</value>
+        </exclude>
+    </target>
+    <source>
+        <path>/Users/guliuzhong/Documents/cms2</path>
+        <exclude>
+            <value>.DS_Store</value>
+            <value>db.ini.php</value>
+            <value>/app/1.php</value>
+        </exclude>
+    </source>
+</sync>
